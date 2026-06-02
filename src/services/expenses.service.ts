@@ -1,10 +1,11 @@
-import { api, assetUrl } from './api';
+import { api } from './api';
 import type { Expense, NewExpense } from '@/types';
 
 const REFRESH_EVENT = 'data:expenses';
 
+// Las fotos se guardan como data URL completo, listas para usar directamente.
 function normalize(e: Expense): Expense {
-  return { ...e, photoUrl: assetUrl(e.photoUrl) };
+  return e;
 }
 
 /**

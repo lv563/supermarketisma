@@ -1,5 +1,13 @@
-# Configuración del backend de GastosPro para Render.com
-# Render lee este archivo automáticamente (Blueprint) al conectar el repo.
+# Configuración de GastosPro para Render.com (Blueprint).
+# Crea automáticamente: una base de datos PostgreSQL gratis (persistente) y el
+# backend (Web Service) ya conectado a ella vía DATABASE_URL.
+
+databases:
+  - name: gastospro-db
+    plan: free
+    databaseName: gastospro
+    user: gastospro
+
 services:
   - type: web
     name: gastospro-api
@@ -8,22 +16,18 @@ services:
     rootDir: server
     buildCommand: npm install
     startCommand: npm run serve
-    # Disco persistente: aquí vive la base de datos SQLite y las fotos subidas.
-    disk:
-      name: gastospro-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: "22"
-      - key: PORT
-        value: "4000"
-      - key: DB_PATH
-        value: /var/data/gastospro.db
-      # JWT_SECRET se genera solo (seguro). Puedes cambiarlo a mano si quieres.
+      # Conexión a la base de datos Postgres de arriba (Render la inyecta sola).
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gastospro-db
+          property: connectionString
+      # Secreto para firmar sesiones (se genera seguro automáticamente).
       - key: JWT_SECRET
         generateValue: true
-      # Correos: configura estos dos en el panel de Render (Environment).
+      # Correos: pega estos dos en el panel de Render → Environment.
       - key: RESEND_API_KEY
         sync: false
       - key: MAIL_FROM

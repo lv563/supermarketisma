@@ -62,10 +62,3 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
 
   return data as T;
 }
-
-/** Convierte una ruta de foto (/uploads/..) en URL absoluta servible. */
-export function assetUrl(path: string | null | undefined): string | undefined {
-  if (!path) return undefined;
-  if (path.startsWith('http') || path.startsWith('data:')) return path;
-  return `${BASE_URL.replace(/\/api$/, '')}${path}`;
-}

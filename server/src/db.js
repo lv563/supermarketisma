@@ -1,82 +1,146 @@
-import { DatabaseSync } from 'node:sqlite';
+/**
+ * Capa de base de datos con doble motor:
+ *  - Local (sin DATABASE_URL): SQLite vía node:sqlite, archivo en disco.
+ *  - Producción (con DATABASE_URL): PostgreSQL (Render gratis, persistente).
+ *
+ * Toda la app usa la misma API async: db.get / db.all / db.run.
+ * El SQL se escribe con placeholders estilo Postgres ($1, $2, …); para SQLite
+ * se convierten a "?" automáticamente.
+ */
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const DATABASE_URL = process.env.DATABASE_URL || '';
+export const USING_POSTGRES = !!DATABASE_URL;
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const DB_PATH = process.env.DB_PATH || join(__dirname, '..', 'data', 'gastospro.db');
+let driver; // { get, all, run }
 
-// Carpeta de datos: la de la base de datos. Aquí también se guardan las fotos,
-// para que todo viva en el mismo disco persistente en producción.
-export const DATA_DIR = dirname(DB_PATH);
-mkdirSync(DATA_DIR, { recursive: true });
+// ---------- IDs ----------
+export function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
 
-export const db = new DatabaseSync(DB_PATH);
+// ---------- SQLite (local) ----------
+async function initSqlite() {
+  const { DatabaseSync } = await import('node:sqlite');
 
-// Mejoras de fiabilidad/concurrencia para SQLite.
-db.exec('PRAGMA journal_mode = WAL');
-db.exec('PRAGMA foreign_keys = ON');
+  const DB_PATH = process.env.DB_PATH || join(__dirname, '..', 'data', 'gastospro.db');
+  mkdirSync(dirname(DB_PATH), { recursive: true });
+
+  const sqlite = new DatabaseSync(DB_PATH);
+  sqlite.exec('PRAGMA journal_mode = WAL');
+  sqlite.exec('PRAGMA foreign_keys = ON');
+
+  // Convierte $1,$2 -> ? (SQLite usa posicionales).
+  const toQ = (sql) => sql.replace(/\$\d+/g, '?');
+
+  driver = {
+    async get(sql, params = []) {
+      return sqlite.prepare(toQ(sql)).get(...params) ?? null;
+    },
+    async all(sql, params = []) {
+      return sqlite.prepare(toQ(sql)).all(...params);
+    },
+    async run(sql, params = []) {
+      sqlite.prepare(toQ(sql)).run(...params);
+    },
+    async exec(sql) {
+      sqlite.exec(sql);
+    },
+  };
+}
+
+// ---------- PostgreSQL (producción) ----------
+async function initPostgres() {
+  const { default: pg } = await import('pg');
+  const pool = new pg.Pool({
+    connectionString: DATABASE_URL,
+    ssl: { rejectUnauthorized: false }, // Render requiere SSL
+  });
+
+  driver = {
+    async get(sql, params = []) {
+      const r = await pool.query(sql, params);
+      return r.rows[0] ?? null;
+    },
+    async all(sql, params = []) {
+      const r = await pool.query(sql, params);
+      return r.rows;
+    },
+    async run(sql, params = []) {
+      await pool.query(sql, params);
+    },
+    async exec(sql) {
+      await pool.query(sql);
+    },
+  };
+}
 
 // ---------- Esquema ----------
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id           TEXT PRIMARY KEY,
-    email        TEXT NOT NULL UNIQUE,
-    name         TEXT NOT NULL DEFAULT '',
-    password     TEXT NOT NULL,            -- scrypt: salt:hash
-    createdAt    INTEGER NOT NULL
-  );
+async function createSchema() {
+  // Tipos compatibles con ambos motores.
+  const INT = USING_POSTGRES ? 'BIGINT' : 'INTEGER';
+  const REAL = USING_POSTGRES ? 'DOUBLE PRECISION' : 'REAL';
 
-  CREATE TABLE IF NOT EXISTS expenses (
-    id           TEXT PRIMARY KEY,
-    amount       REAL NOT NULL,
-    category     TEXT NOT NULL,
-    date         TEXT NOT NULL,            -- 'yyyy-MM-dd' (día del registro)
-    time         TEXT NOT NULL,            -- 'HH:mm'
-    note         TEXT,
-    photoUrl     TEXT,
-    createdBy    TEXT NOT NULL,
-    createdAt    INTEGER NOT NULL,
-    FOREIGN KEY (createdBy) REFERENCES users(id) ON DELETE CASCADE
-  );
+  await driver.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id        TEXT PRIMARY KEY,
+      email     TEXT NOT NULL UNIQUE,
+      name      TEXT NOT NULL DEFAULT '',
+      password  TEXT NOT NULL,
+      createdAt ${INT} NOT NULL
+    );
+  `);
 
-  CREATE TABLE IF NOT EXISTS invoices (
-    id            TEXT PRIMARY KEY,
-    supplier      TEXT NOT NULL,
-    invoiceNumber TEXT NOT NULL DEFAULT '',
-    amount        REAL NOT NULL,
-    issueDate     TEXT NOT NULL,
-    dueDate       TEXT NOT NULL,
-    status        TEXT NOT NULL DEFAULT 'pendiente',
-    createdBy     TEXT NOT NULL,
-    createdAt     INTEGER NOT NULL,
-    FOREIGN KEY (createdBy) REFERENCES users(id) ON DELETE CASCADE
-  );
+  await driver.exec(`
+    CREATE TABLE IF NOT EXISTS expenses (
+      id        TEXT PRIMARY KEY,
+      amount    ${REAL} NOT NULL,
+      category  TEXT NOT NULL,
+      date      TEXT NOT NULL,
+      time      TEXT NOT NULL,
+      note      TEXT,
+      photoUrl  TEXT,
+      createdBy TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      createdAt ${INT} NOT NULL
+    );
+  `);
 
-  CREATE INDEX IF NOT EXISTS idx_expenses_user_created
-    ON expenses (createdBy, createdAt DESC);
-  CREATE INDEX IF NOT EXISTS idx_expenses_user_date
-    ON expenses (createdBy, date);
-  CREATE INDEX IF NOT EXISTS idx_invoices_user_due
-    ON invoices (createdBy, dueDate);
-`);
+  await driver.exec(`
+    CREATE TABLE IF NOT EXISTS invoices (
+      id            TEXT PRIMARY KEY,
+      supplier      TEXT NOT NULL,
+      invoiceNumber TEXT NOT NULL DEFAULT '',
+      amount        ${REAL} NOT NULL,
+      issueDate     TEXT NOT NULL,
+      dueDate       TEXT NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'pendiente',
+      remindedDueSoon TEXT,
+      remindedOverdue TEXT,
+      createdBy     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      createdAt     ${INT} NOT NULL
+    );
+  `);
 
-// ---------- Migraciones ligeras ----------
-// Añade columnas nuevas a tablas existentes sin perder datos.
-function ensureColumn(table, column, definition) {
-  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
-  if (!cols.some((c) => c.name === column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-  }
+  await driver.exec(`CREATE INDEX IF NOT EXISTS idx_expenses_user_created ON expenses (createdBy, createdAt);`);
+  await driver.exec(`CREATE INDEX IF NOT EXISTS idx_expenses_user_date ON expenses (createdBy, date);`);
+  await driver.exec(`CREATE INDEX IF NOT EXISTS idx_invoices_user_due ON invoices (createdBy, dueDate);`);
 }
 
-// Marcas para no reenviar el mismo recordatorio (guardan la fecha 'yyyy-MM-dd' del envío).
-ensureColumn('invoices', 'remindedDueSoon', 'TEXT');
-ensureColumn('invoices', 'remindedOverdue', 'TEXT');
-
-export function uid() {
-  return (
-    Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
-  );
+// ---------- Init ----------
+export async function initDb() {
+  if (USING_POSTGRES) await initPostgres();
+  else await initSqlite();
+  await createSchema();
+  console.log(`🗄️  Base de datos lista: ${USING_POSTGRES ? 'PostgreSQL' : 'SQLite (local)'}`);
 }
+
+// API pública (async, idéntica para ambos motores).
+export const db = {
+  get: (sql, params) => driver.get(sql, params),
+  all: (sql, params) => driver.all(sql, params),
+  run: (sql, params) => driver.run(sql, params),
+};

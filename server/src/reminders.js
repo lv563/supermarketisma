@@ -1,12 +1,12 @@
 import { db } from './db.js';
-import {
-  sendEmail,
-  invoiceDueSoonEmail,
-  invoiceOverdueEmail,
-} from './email.js';
+import { sendEmail, invoiceDueSoonEmail, invoiceOverdueEmail } from './email.js';
 
-// Días de anticipación para el aviso "por vencer".
 const DUE_SOON_DAYS = Number(process.env.REMINDER_DAYS_AHEAD || 2);
+
+const SELECT_COLS =
+  'id, supplier, invoicenumber AS "invoiceNumber", amount, issuedate AS "issueDate", ' +
+  'duedate AS "dueDate", status, createdby AS "createdBy", ' +
+  'remindedduesoon AS "remindedDueSoon", remindedoverdue AS "remindedOverdue"';
 
 function todayISO() {
   const d = new Date();
@@ -20,44 +20,37 @@ function daysBetween(fromISO, toISO) {
 }
 
 /**
- * Revisa todas las facturas pendientes y envía:
- *  - "por vencer" si faltan <= DUE_SOON_DAYS (incluye hoy y mañana)
- *  - "vencida" si la fecha ya pasó
- * Usa las columnas remindedDueSoon / remindedOverdue para no repetir el mismo día.
+ * Revisa facturas pendientes y envía recordatorios de "por vencer" y "vencida",
+ * sin repetir el mismo aviso el mismo día.
  */
 export async function runInvoiceReminders() {
   const today = todayISO();
-
-  const invoices = db
-    .prepare(`SELECT * FROM invoices WHERE status = 'pendiente'`)
-    .all();
+  const invoices = await db.all(`SELECT ${SELECT_COLS} FROM invoices WHERE status = 'pendiente'`);
 
   let sent = 0;
 
   for (const inv of invoices) {
-    const diff = daysBetween(today, inv.dueDate); // >0 futuro, 0 hoy, <0 vencida
-    const user = db.prepare('SELECT email FROM users WHERE id = ?').get(inv.createdBy);
+    const diff = daysBetween(today, inv.dueDate);
+    const user = await db.get('SELECT email FROM users WHERE id = $1', [inv.createdBy]);
     if (!user?.email) continue;
 
-    // Vencida
     if (diff < 0) {
-      if (inv.remindedOverdue === today) continue; // ya avisado hoy
-      const mail = invoiceOverdueEmail(inv, Math.abs(diff));
-      const ok = await sendEmail({ to: user.email, subject: mail.subject, html: mail.html });
+      if (inv.remindedOverdue === today) continue;
+      const m = invoiceOverdueEmail(inv, Math.abs(diff));
+      const ok = await sendEmail({ to: user.email, subject: m.subject, html: m.html });
       if (ok) {
-        db.prepare('UPDATE invoices SET remindedOverdue = ? WHERE id = ?').run(today, inv.id);
+        await db.run('UPDATE invoices SET remindedOverdue = $1 WHERE id = $2', [today, inv.id]);
         sent++;
       }
       continue;
     }
 
-    // Por vencer (hoy, mañana, … hasta DUE_SOON_DAYS)
     if (diff <= DUE_SOON_DAYS) {
       if (inv.remindedDueSoon === today) continue;
-      const mail = invoiceDueSoonEmail(inv, diff);
-      const ok = await sendEmail({ to: user.email, subject: mail.subject, html: mail.html });
+      const m = invoiceDueSoonEmail(inv, diff);
+      const ok = await sendEmail({ to: user.email, subject: m.subject, html: m.html });
       if (ok) {
-        db.prepare('UPDATE invoices SET remindedDueSoon = ? WHERE id = ?').run(today, inv.id);
+        await db.run('UPDATE invoices SET remindedDueSoon = $1 WHERE id = $2', [today, inv.id]);
         sent++;
       }
     }
@@ -67,11 +60,6 @@ export async function runInvoiceReminders() {
   return sent;
 }
 
-/**
- * Programa la revisión: una al arrancar (tras 10s) y luego cada 12 horas.
- * Simple y suficiente para un negocio pequeño; en producción puede sustituirse
- * por un cron real del sistema o del proveedor de hosting.
- */
 export function startReminderScheduler() {
   const TWELVE_HOURS = 12 * 60 * 60 * 1000;
   setTimeout(() => {
