@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-100 text-slate-900 antialiased;
+}
+
+/* Inputs grandes y cómodos: la captura rápida manda. */
+@layer components {
+  .field {
+    @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base
+      outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200;
+  }
+}
+
+/* FullCalendar overrides ligeros */
+.fc {
+  --fc-border-color: #e2e8f0;
+  --fc-today-bg-color: #eef6ff;
+  font-size: 0.85rem;
+}
+.fc .fc-button-primary {
+  background-color: #1d5cf5;
+  border-color: #1d5cf5;
+}
+.fc .fc-button-primary:hover {
+  background-color: #1647e1;
+  border-color: #1647e1;
+}

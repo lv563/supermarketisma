@@ -1,0 +1,22 @@
+# dependencies
+node_modules
+
+# build
+dist
+
+# env
+.env
+.env.local
+*.local
+
+# backend data (base de datos SQLite + fotos subidas)
+server/data
+
+# logs / temp
+*-out.txt
+*.log
+
+# editor / os
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
