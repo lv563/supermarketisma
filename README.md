@@ -228,18 +228,45 @@ El backend envía correos en estos momentos:
 
 ---
 
-## ☁️ Despliegue
+## ☁️ Despliegue (Vercel + Render)
 
-**Frontend** (estático): `npm run build` → sube `dist/` a Vercel, Netlify o cualquier
-hosting estático. Define `VITE_API_URL` apuntando a tu backend público.
+La app son **dos piezas**: el frontend (estático, va a **Vercel**) y el backend con
+base de datos y correos (un proceso Node siempre vivo, va a **Render**). Ambos tienen
+plan gratuito. Hazlo en este orden.
 
-**Backend** (Node): despliega la carpeta `server/` en un host que soporte Node 22+
-(Railway, Render, Fly.io, un VPS…). Define `JWT_SECRET` y un `DB_PATH` en un volumen
-persistente. Arranca con `npm run serve`.
+### 1) Backend en Render
+1. Entra a https://render.com → **New** → **Blueprint** y conecta el repo de GitHub.
+   Render detecta el archivo [`render.yaml`](render.yaml) y crea el servicio
+   `gastospro-api` con un **disco persistente** (ahí viven la base de datos y las fotos).
+2. En **Environment**, añade tus claves de correo (ver sección de Resend):
+   - `RESEND_API_KEY` = tu API key
+   - `MAIL_FROM` = `GastosPro <algo@tudominio.com>` (o `onboarding@resend.dev` para probar)
+3. Deploy. Copia la URL pública, p. ej. `https://gastospro-api.onrender.com`.
 
-> Para producción seria, considera migrar de SQLite a PostgreSQL (el código de datos
-> está aislado en `server/src/db.js` y las rutas), y servir las fotos desde un bucket
-> (S3/Cloud Storage) en vez del disco local.
+> Nota del plan gratis de Render: el servicio "se duerme" tras ~15 min sin uso y
+> tarda unos segundos en despertar en la siguiente visita. Los datos **no se pierden**
+> (están en el disco). Para los recordatorios de correo, ver el aviso más abajo.
+
+### 2) Frontend en Vercel
+1. Entra a https://vercel.com → **Add New Project** y conecta el mismo repo.
+   Detecta Vite automáticamente (config en [`vercel.json`](vercel.json)).
+2. En **Environment Variables** añade:
+   - `VITE_API_URL` = `https://gastospro-api.onrender.com/api` (la URL de Render + `/api`)
+3. Deploy. Tu app queda en `https://tu-proyecto.vercel.app`.
+
+### ⏰ Recordatorios de correo en producción
+El temporizador interno cada 12 h solo corre mientras el backend esté despierto. En el
+plan gratis de Render, que se duerme, lo fiable es un **cron externo gratuito**:
+1. Crea una cuenta en https://cron-job.org (gratis).
+2. Programa una petición diaria (p. ej. 8:00 AM) a:
+   `POST https://gastospro-api.onrender.com/api/reminders/run`
+   con el header `Authorization: Bearer <token>` de una cuenta tuya.
+
+Esto despierta el backend y dispara los avisos de "por vencer" y "vencidas" cada día.
+
+> Para producción a mayor escala, considera migrar de SQLite a PostgreSQL (el acceso a
+> datos está aislado en `server/src/db.js` y las rutas) y guardar las fotos en un bucket
+> (S3 / Cloud Storage) en lugar del disco local.
 
 ---
 

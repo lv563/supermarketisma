@@ -1,0 +1,32 @@
+# Configuración del backend de GastosPro para Render.com
+# Render lee este archivo automáticamente (Blueprint) al conectar el repo.
+services:
+  - type: web
+    name: gastospro-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm run serve
+    # Disco persistente: aquí vive la base de datos SQLite y las fotos subidas.
+    disk:
+      name: gastospro-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PORT
+        value: "4000"
+      - key: DB_PATH
+        value: /var/data/gastospro.db
+      # JWT_SECRET se genera solo (seguro). Puedes cambiarlo a mano si quieres.
+      - key: JWT_SECRET
+        generateValue: true
+      # Correos: configura estos dos en el panel de Render (Environment).
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: REMINDER_DAYS_AHEAD
+        value: "2"

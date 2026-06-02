@@ -4,10 +4,13 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = join(__dirname, '..', 'data');
-mkdirSync(DATA_DIR, { recursive: true });
 
-const DB_PATH = process.env.DB_PATH || join(DATA_DIR, 'gastospro.db');
+const DB_PATH = process.env.DB_PATH || join(__dirname, '..', 'data', 'gastospro.db');
+
+// Carpeta de datos: la de la base de datos. Aquí también se guardan las fotos,
+// para que todo viva en el mismo disco persistente en producción.
+export const DATA_DIR = dirname(DB_PATH);
+mkdirSync(DATA_DIR, { recursive: true });
 
 export const db = new DatabaseSync(DB_PATH);
 

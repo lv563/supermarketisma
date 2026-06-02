@@ -1,15 +1,14 @@
 import express from 'express';
 import cors from 'cors';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { authRouter } from './routes/auth.routes.js';
 import { expensesRouter } from './routes/expenses.routes.js';
 import { invoicesRouter } from './routes/invoices.routes.js';
 import { uploadRouter } from './routes/upload.routes.js';
 import { startReminderScheduler, runInvoiceReminders } from './reminders.js';
 import { requireAuth } from './auth.js';
+import { DATA_DIR } from './db.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 4000;
 
 const app = express();
@@ -17,8 +16,8 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '8mb' })); // 8mb para aceptar fotos en base64
 
-// Fotos servidas estáticamente
-app.use('/uploads', express.static(join(__dirname, '..', 'data', 'uploads')));
+// Fotos servidas estáticamente (misma carpeta de datos que la base de datos)
+app.use('/uploads', express.static(join(DATA_DIR, 'uploads')));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 

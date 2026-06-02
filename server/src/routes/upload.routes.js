@@ -1,12 +1,10 @@
 import { Router } from 'express';
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { requireAuth } from '../auth.js';
-import { uid } from '../db.js';
+import { uid, DATA_DIR } from '../db.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const UPLOAD_DIR = join(__dirname, '..', '..', 'data', 'uploads');
+const UPLOAD_DIR = join(DATA_DIR, 'uploads');
 mkdirSync(UPLOAD_DIR, { recursive: true });
 
 export const uploadRouter = Router();
