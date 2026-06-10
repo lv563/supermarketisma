@@ -16,6 +16,12 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '8mb' })); // 8mb para aceptar fotos en base64
 
+// Las respuestas de la API son datos en vivo: nunca deben cachearse.
+app.use('/api', (_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+
 app.get('/api/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
 app.use('/api/auth', authRouter);

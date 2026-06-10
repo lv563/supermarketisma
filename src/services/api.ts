@@ -33,6 +33,9 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      // Evita que el navegador sirva respuestas viejas desde su caché: siempre
+      // pedimos datos frescos al servidor (clave para ver cambios al instante).
+      cache: 'no-store',
     });
   } catch {
     throw new Error('No se pudo conectar con el servidor. ¿Está corriendo el backend?');
