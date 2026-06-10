@@ -1,4 +1,5 @@
 import { api, setToken, getToken } from './api';
+import { resetCategories } from './categories.service';
 import type { AppUser } from '@/types';
 
 interface AuthResponse {
@@ -63,5 +64,6 @@ export async function signUp(name: string, email: string, password: string): Pro
 
 export async function signOut(): Promise<void> {
   setToken(null);
+  resetCategories();
   window.dispatchEvent(new Event('auth:changed'));
 }
