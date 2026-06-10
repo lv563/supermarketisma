@@ -8,7 +8,8 @@ import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { createExpense } from '@/services/expenses.service';
 import { uploadPhoto } from '@/services/storage.service';
 import { cn, formatMoney, parseVoiceExpense } from '@/lib/utils';
-import { CATEGORY_MAP } from '@/constants/categories';
+import { resolveCategory } from '@/constants/categories';
+import { useCategories } from '@/hooks/useCategories';
 import type { ExpenseCategory, NewExpense } from '@/types';
 
 interface QuickExpenseFormProps {
@@ -24,6 +25,7 @@ interface QuickExpenseFormProps {
 export function QuickExpenseForm({ onSaved, autoFocus = true }: QuickExpenseFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { categories } = useCategories();
   const voice = useVoiceInput();
 
   const [amount, setAmount] = useState('');
@@ -71,7 +73,7 @@ export function QuickExpenseForm({ onSaved, autoFocus = true }: QuickExpenseForm
       if (trimmedNote) payload.note = trimmedNote;
       if (photo) payload.photoUrl = await uploadPhoto(user.uid, photo);
       await createExpense(user.uid, payload);
-      toast(`Guardado: ${formatMoney(amountValue)} · ${CATEGORY_MAP[categoryValue].label}`);
+      toast(`Guardado: ${formatMoney(amountValue)} · ${resolveCategory(categoryValue, categories).label}`);
       // reset para registrar otro de inmediato
       setAmount('');
       setCategory(null);

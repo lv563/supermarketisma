@@ -14,11 +14,13 @@ import { QuickExpenseForm } from '@/components/expenses/QuickExpenseForm';
 import { PageLoader, EmptyState } from '@/components/ui/Spinner';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useInvoices } from '@/hooks/useInvoices';
+import { useCategories } from '@/hooks/useCategories';
 import { formatMoney, formatDateShort, daysUntil } from '@/lib/utils';
-import { CATEGORY_MAP } from '@/constants/categories';
+import { resolveCategory } from '@/constants/categories';
 
 export function DashboardPage() {
   const { todayExpenses, todayTotal, loading: loadingExp } = useExpenses();
+  const { categories } = useCategories();
   const {
     pending,
     overdue,
@@ -123,7 +125,7 @@ export function DashboardPage() {
             ) : (
               <ul className="space-y-2">
                 {todayExpenses.slice(0, 5).map((e) => {
-                  const cat = CATEGORY_MAP[e.category];
+                  const cat = resolveCategory(e.category, categories);
                   return (
                     <li key={e.id} className="flex items-center gap-3">
                       <span className="text-xl">{cat.emoji}</span>

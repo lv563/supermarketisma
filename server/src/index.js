@@ -4,6 +4,7 @@ import { authRouter } from './routes/auth.routes.js';
 import { expensesRouter } from './routes/expenses.routes.js';
 import { invoicesRouter } from './routes/invoices.routes.js';
 import { uploadRouter } from './routes/upload.routes.js';
+import { categoriesRouter } from './routes/categories.routes.js';
 import { startReminderScheduler, runInvoiceReminders } from './reminders.js';
 import { requireAuth } from './auth.js';
 import { initDb } from './db.js';
@@ -21,6 +22,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/expenses', expensesRouter);
 app.use('/api/invoices', invoicesRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/categories', categoriesRouter);
 
 // Disparo manual de recordatorios (útil para probar / cron externo). Requiere sesión.
 app.post('/api/reminders/run', requireAuth, async (_req, res, next) => {

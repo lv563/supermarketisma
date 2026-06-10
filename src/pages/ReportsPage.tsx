@@ -17,22 +17,29 @@ import { StatCard } from '@/components/ui/Card';
 import { PageLoader, EmptyState } from '@/components/ui/Spinner';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useInvoices } from '@/hooks/useInvoices';
+import { useCategories } from '@/hooks/useCategories';
 import { formatMoney, toISODate } from '@/lib/utils';
-import { CATEGORY_MAP, CATEGORIES } from '@/constants/categories';
+import { resolveCategory } from '@/constants/categories';
 
-const PIE_COLORS = ['#f59e0b', '#f43f5e', '#0ea5e9', '#8b5cf6', '#10b981', '#94a3b8'];
+const PIE_COLORS = ['#f59e0b', '#f43f5e', '#0ea5e9', '#8b5cf6', '#10b981', '#94a3b8', '#6366f1', '#ec4899', '#14b8a6'];
 
 export function ReportsPage() {
   const { expenses, loading: le } = useExpenses();
   const { pending, paid, overdue, loading: li } = useInvoices();
+  const { categories } = useCategories();
 
+  // Agrupa por la categoría real de cada gasto (incluye personalizadas).
   const byCategory = useMemo(() => {
     const totals = new Map<string, number>();
     for (const e of expenses) totals.set(e.category, (totals.get(e.category) ?? 0) + e.amount);
-    return CATEGORIES.map((c) => ({ name: c.label, value: totals.get(c.id) ?? 0 })).filter(
-      (d) => d.value > 0,
-    );
-  }, [expenses]);
+    return [...totals.entries()]
+      .map(([id, value]) => {
+        const meta = resolveCategory(id, categories);
+        return { name: meta.label, emoji: meta.emoji, value };
+      })
+      .filter((d) => d.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [expenses, categories]);
 
   // Últimos 7 días
   const weekly = useMemo(() => {
@@ -137,16 +144,13 @@ export function ReportsPage() {
       <Card>
         <h2 className="mb-4 font-semibold text-slate-900">Detalle por categoría</h2>
         <div className="space-y-2">
-          {byCategory
-            .sort((a, b) => b.value - a.value)
-            .map((d) => {
-              const meta = CATEGORIES.find((c) => c.label === d.name)!;
+          {byCategory.map((d) => {
               const pct = totalSpent ? Math.round((d.value / totalSpent) * 100) : 0;
               return (
                 <div key={d.name}>
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <span className="font-medium text-slate-700">
-                      {CATEGORY_MAP[meta.id].emoji} {d.name}
+                      {d.emoji} {d.name}
                     </span>
                     <span className="font-semibold text-slate-900">
                       {formatMoney(d.value)} · {pct}%

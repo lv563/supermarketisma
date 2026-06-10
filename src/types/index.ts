@@ -1,11 +1,24 @@
 // ---------- Categorías de gasto ----------
-export type ExpenseCategory =
+// Las predefinidas tienen id fijo; las personalizadas usan su id de la BD.
+export type BuiltinCategory =
   | 'combustible'
   | 'comida'
   | 'transporte'
   | 'factura'
   | 'materiales'
   | 'otros';
+
+/** Una categoría puede ser predefinida o personalizada (id arbitrario). */
+export type ExpenseCategory = BuiltinCategory | (string & {});
+
+/** Categoría personalizada creada por el usuario, guardada en la BD. */
+export interface CustomCategory {
+  id: string;
+  label: string;
+  emoji: string;
+  createdBy: string;
+  createdAt: number;
+}
 
 // ---------- Gastos ----------
 export interface Expense {

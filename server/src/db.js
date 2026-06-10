@@ -125,9 +125,21 @@ async function createSchema() {
     );
   `);
 
+  // Categorías personalizadas que crea cada usuario (además de las predefinidas).
+  await driver.exec(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id        TEXT PRIMARY KEY,
+      label     TEXT NOT NULL,
+      emoji     TEXT NOT NULL DEFAULT '📦',
+      createdBy TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      createdAt ${INT} NOT NULL
+    );
+  `);
+
   await driver.exec(`CREATE INDEX IF NOT EXISTS idx_expenses_user_created ON expenses (createdBy, createdAt);`);
   await driver.exec(`CREATE INDEX IF NOT EXISTS idx_expenses_user_date ON expenses (createdBy, date);`);
   await driver.exec(`CREATE INDEX IF NOT EXISTS idx_invoices_user_due ON invoices (createdBy, dueDate);`);
+  await driver.exec(`CREATE INDEX IF NOT EXISTS idx_categories_user ON categories (createdBy);`);
 }
 
 // ---------- Init ----------
