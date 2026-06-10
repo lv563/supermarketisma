@@ -59,7 +59,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <p className="font-semibold text-white">Regla #1</p>
           <p className="mt-1 leading-snug">Registrar algo debe tomar menos tiempo que ignorarlo.</p>
         </div>
-        <p className="mt-2 text-center text-[10px] text-slate-400">v2 · categorías</p>
+        <p className="mt-2 text-center text-[10px] text-slate-400">v3 · categorías</p>
       </div>
     </aside>
   );
