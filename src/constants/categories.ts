@@ -1,4 +1,4 @@
-import type { CustomCategory, ExpenseCategory } from '@/types';
+import type { ExpenseCategory } from '@/types';
 
 export interface CategoryMeta {
   id: ExpenseCategory;
@@ -66,29 +66,7 @@ export const CATEGORY_MAP: Record<string, CategoryMeta> = [...CATEGORIES, OTHERS
   {} as Record<string, CategoryMeta>,
 );
 
-// Paleta para asignar color estable a las categorías personalizadas.
-const CUSTOM_COLORS = [
-  'bg-indigo-100 text-indigo-800 ring-indigo-200',
-  'bg-pink-100 text-pink-800 ring-pink-200',
-  'bg-teal-100 text-teal-800 ring-teal-200',
-  'bg-orange-100 text-orange-800 ring-orange-200',
-  'bg-lime-100 text-lime-800 ring-lime-200',
-  'bg-cyan-100 text-cyan-800 ring-cyan-200',
-];
-
-function colorFor(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return CUSTOM_COLORS[hash % CUSTOM_COLORS.length];
-}
-
-/** Devuelve la metadata de una categoría, sea predefinida o personalizada. */
-export function resolveCategory(
-  id: ExpenseCategory,
-  custom: CustomCategory[] = [],
-): CategoryMeta {
-  if (CATEGORY_MAP[id]) return CATEGORY_MAP[id];
-  const c = custom.find((x) => x.id === id);
-  if (c) return { id: c.id, label: c.label, emoji: c.emoji, color: colorFor(c.id), keywords: [] };
-  return OTHERS;
+/** Devuelve la metadata de una categoría (o "Otros" si no se reconoce). */
+export function resolveCategory(id: ExpenseCategory): CategoryMeta {
+  return CATEGORY_MAP[id] ?? OTHERS;
 }

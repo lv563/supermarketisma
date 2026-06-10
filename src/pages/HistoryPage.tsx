@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/Input';
 import { PageLoader, EmptyState } from '@/components/ui/Spinner';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useExpenseFilters } from '@/hooks/useExpenseFilters';
-import { useCategories } from '@/hooks/useCategories';
 import { useToast } from '@/contexts/ToastContext';
 import { deleteExpense } from '@/services/expenses.service';
 import { formatMoney, formatDateShort } from '@/lib/utils';
@@ -13,7 +12,6 @@ import { CATEGORIES, OTHERS, resolveCategory } from '@/constants/categories';
 
 export function HistoryPage() {
   const { expenses, loading } = useExpenses();
-  const { categories } = useCategories();
   const { filters, update, reset, filtered, total } = useExpenseFilters(expenses);
   const { toast } = useToast();
 
@@ -49,7 +47,7 @@ export function HistoryPage() {
             onChange={(e) => update({ category: e.target.value as never })}
           >
             <option value="todas">Toda categoría</option>
-            {[...CATEGORIES, ...categories, OTHERS].map((c) => (
+            {[...CATEGORIES, OTHERS].map((c) => (
               <option key={c.id} value={c.id}>
                 {c.emoji} {c.label}
               </option>
@@ -88,7 +86,7 @@ export function HistoryPage() {
         <Card className="overflow-hidden p-0">
           <ul className="divide-y divide-slate-100">
             {filtered.map((e) => {
-              const cat = resolveCategory(e.category, categories);
+              const cat = resolveCategory(e.category);
               return (
                 <li key={e.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
                   <span className="text-2xl">{cat.emoji}</span>

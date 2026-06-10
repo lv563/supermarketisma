@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { subscribeExpenses } from '@/services/expenses.service';
+import { subscribeExpenses, expensesLoaded } from '@/services/expenses.service';
 import { todayISO } from '@/lib/utils';
 import type { Expense } from '@/types';
 
 export function useExpenses() {
   const { user } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Si el store ya cargó antes, no mostramos "Cargando" de nuevo.
+  const [loading, setLoading] = useState(!expensesLoaded());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
-    setLoading(true);
     const unsub = subscribeExpenses(
       user.uid,
       (data) => {

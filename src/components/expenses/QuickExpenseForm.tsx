@@ -9,7 +9,6 @@ import { createExpense } from '@/services/expenses.service';
 import { uploadPhoto } from '@/services/storage.service';
 import { cn, formatMoney, parseVoiceExpense } from '@/lib/utils';
 import { resolveCategory } from '@/constants/categories';
-import { useCategories } from '@/hooks/useCategories';
 import type { ExpenseCategory, NewExpense } from '@/types';
 
 interface QuickExpenseFormProps {
@@ -25,11 +24,11 @@ interface QuickExpenseFormProps {
 export function QuickExpenseForm({ onSaved, autoFocus = true }: QuickExpenseFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { categories } = useCategories();
   const voice = useVoiceInput();
 
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<ExpenseCategory | null>(null);
+  const [customName, setCustomName] = useState(''); // nombre cuando se elige "Otros"
   const [note, setNote] = useState('');
   const [showNote, setShowNote] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
@@ -69,14 +68,23 @@ export function QuickExpenseForm({ onSaved, autoFocus = true }: QuickExpenseForm
     setSaving(true);
     try {
       const payload: NewExpense = { amount: amountValue, category: categoryValue };
+
+      // Si es "Otros" y el usuario escribió un nombre, lo guardamos en la nota
+      // (así el gasto queda identificado sin crear categorías nuevas).
+      const custom = categoryValue === 'otros' ? customName.trim() : '';
       const trimmedNote = note.trim();
-      if (trimmedNote) payload.note = trimmedNote;
+      const fullNote = [custom, trimmedNote].filter(Boolean).join(' · ');
+      if (fullNote) payload.note = fullNote;
+
       if (photo) payload.photoUrl = await uploadPhoto(user.uid, photo);
       await createExpense(user.uid, payload);
-      toast(`Guardado: ${formatMoney(amountValue)} · ${resolveCategory(categoryValue, categories).label}`);
+
+      const label = custom || resolveCategory(categoryValue).label;
+      toast(`Guardado: ${formatMoney(amountValue)} · ${label}`);
       // reset para registrar otro de inmediato
       setAmount('');
       setCategory(null);
+      setCustomName('');
       setNote('');
       setShowNote(false);
       setPhoto(null);
@@ -125,6 +133,18 @@ export function QuickExpenseForm({ onSaved, autoFocus = true }: QuickExpenseForm
       <div>
         <label className="mb-2 block text-sm font-medium text-slate-500">Categoría</label>
         <CategoryPicker value={category} onChange={setCategory} />
+
+        {/* Al elegir "Otros", se puede ponerle un nombre a este gasto. */}
+        {category === 'otros' && (
+          <input
+            autoFocus
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value)}
+            maxLength={40}
+            placeholder="¿Qué fue? Ej: Renta, Limpieza, Imprevisto…"
+            className="field mt-3"
+          />
+        )}
       </div>
 
       {/* Opcionales: nota, foto, voz */}

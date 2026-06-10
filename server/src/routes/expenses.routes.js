@@ -5,17 +5,7 @@ import { requireAuth } from '../auth.js';
 export const expensesRouter = Router();
 expensesRouter.use(requireAuth);
 
-const BUILTIN_CATEGORIES = ['combustible', 'comida', 'transporte', 'factura', 'materiales', 'otros'];
-
-/** Acepta una categoría predefinida o una personalizada del propio usuario. */
-async function isValidCategory(category, userId) {
-  if (BUILTIN_CATEGORIES.includes(category)) return true;
-  const custom = await db.get('SELECT id FROM categories WHERE id = $1 AND createdBy = $2', [
-    category,
-    userId,
-  ]);
-  return !!custom;
-}
+const VALID_CATEGORIES = ['combustible', 'comida', 'transporte', 'factura', 'materiales', 'otros'];
 
 // Alias explícitos: Postgres pasa a minúsculas las columnas sin comillas, así que
 // los renombramos para que el frontend siempre reciba camelCase.
@@ -52,8 +42,7 @@ expensesRouter.post('/', async (req, res, next) => {
     const { amount, category, note, photoUrl } = req.body || {};
     const value = Number(amount);
     if (!value || value <= 0) return res.status(400).json({ error: 'Monto inválido' });
-    if (!category || !(await isValidCategory(category, req.userId)))
-      return res.status(400).json({ error: 'Categoría inválida' });
+    if (!VALID_CATEGORIES.includes(category)) return res.status(400).json({ error: 'Categoría inválida' });
 
     const expense = {
       id: uid(),

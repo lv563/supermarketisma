@@ -8,17 +8,8 @@ export type BuiltinCategory =
   | 'materiales'
   | 'otros';
 
-/** Una categoría puede ser predefinida o personalizada (id arbitrario). */
+/** El id de una categoría: predefinida o un texto libre antiguo. */
 export type ExpenseCategory = BuiltinCategory | (string & {});
-
-/** Categoría personalizada creada por el usuario, guardada en la BD. */
-export interface CustomCategory {
-  id: string;
-  label: string;
-  emoji: string;
-  createdBy: string;
-  createdAt: number;
-}
 
 // ---------- Gastos ----------
 export interface Expense {

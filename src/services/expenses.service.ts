@@ -1,54 +1,83 @@
 import { api } from './api';
 import type { Expense, NewExpense } from '@/types';
 
-const REFRESH_EVENT = 'data:expenses';
+/**
+ * Store en memoria de gastos, compartido por todas las pantallas (dashboard,
+ * historial, reportes). Al crear/eliminar se actualiza al instante (optimista)
+ * y `seq` descarta respuestas GET lentas que llegarían a destiempo.
+ */
+let cache: Expense[] = [];
+let seq = 0;
+let everLoaded = false;
+let refreshing = false;
+const listeners = new Set<(e: Expense[]) => void>();
 
-// Las fotos se guardan como data URL completo, listas para usar directamente.
-function normalize(e: Expense): Expense {
-  return e;
+function emit() {
+  for (const l of listeners) l(cache);
 }
 
-/**
- * "Suscripción" a los gastos: hace fetch inicial y vuelve a consultar cada vez
- * que se crea/elimina un gasto (evento interno). Devuelve unsubscribe.
- */
+function sortByCreated(list: Expense[]): Expense[] {
+  return [...list].sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
+}
+
+async function refresh(): Promise<void> {
+  if (refreshing) return;
+  refreshing = true;
+  const mySeq = seq;
+  try {
+    const data = await api<Expense[]>('/expenses');
+    if (mySeq !== seq) return; // hubo un cambio local mientras esperábamos
+    cache = sortByCreated(data);
+    everLoaded = true;
+    emit();
+  } finally {
+    refreshing = false;
+  }
+}
+
 export function subscribeExpenses(
   _uid: string,
   onData: (expenses: Expense[]) => void,
   onError?: (e: Error) => void,
 ): () => void {
-  let active = true;
-
-  async function load() {
-    try {
-      const data = await api<Expense[]>('/expenses');
-      if (active) onData(data.map(normalize));
-    } catch (e) {
-      if (active) onError?.(e instanceof Error ? e : new Error('Error al cargar gastos'));
-    }
-  }
-
-  void load();
-  const handler = () => void load();
-  window.addEventListener(REFRESH_EVENT, handler);
+  listeners.add(onData);
+  onData(cache);
+  // Refresca siempre desde el servidor al montar (trae cambios desde otros equipos).
+  refresh().catch((e) =>
+    onError?.(e instanceof Error ? e : new Error('Error al cargar gastos')),
+  );
   return () => {
-    active = false;
-    window.removeEventListener(REFRESH_EVENT, handler);
+    listeners.delete(onData);
   };
 }
 
 export async function fetchExpenses(): Promise<Expense[]> {
-  const data = await api<Expense[]>('/expenses');
-  return data.map(normalize);
+  return api<Expense[]>('/expenses');
 }
 
 /** Crea un gasto. El backend agrega fecha, hora y usuario automáticamente. */
 export async function createExpense(_uid: string, input: NewExpense): Promise<void> {
-  await api<Expense>('/expenses', { method: 'POST', body: input });
-  window.dispatchEvent(new Event(REFRESH_EVENT));
+  const created = await api<Expense>('/expenses', { method: 'POST', body: input });
+  seq++;
+  cache = sortByCreated([created, ...cache]);
+  everLoaded = true;
+  emit();
 }
 
 export async function deleteExpense(id: string): Promise<void> {
   await api<{ ok: true }>(`/expenses/${id}`, { method: 'DELETE' });
-  window.dispatchEvent(new Event(REFRESH_EVENT));
+  seq++;
+  cache = cache.filter((e) => e.id !== id);
+  emit();
+}
+
+export function resetExpenses(): void {
+  seq++;
+  cache = [];
+  everLoaded = false;
+  emit();
+}
+
+export function expensesLoaded(): boolean {
+  return everLoaded;
 }

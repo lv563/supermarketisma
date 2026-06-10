@@ -17,7 +17,6 @@ import { StatCard } from '@/components/ui/Card';
 import { PageLoader, EmptyState } from '@/components/ui/Spinner';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useInvoices } from '@/hooks/useInvoices';
-import { useCategories } from '@/hooks/useCategories';
 import { formatMoney, toISODate } from '@/lib/utils';
 import { resolveCategory } from '@/constants/categories';
 
@@ -26,20 +25,19 @@ const PIE_COLORS = ['#f59e0b', '#f43f5e', '#0ea5e9', '#8b5cf6', '#10b981', '#94a
 export function ReportsPage() {
   const { expenses, loading: le } = useExpenses();
   const { pending, paid, overdue, loading: li } = useInvoices();
-  const { categories } = useCategories();
 
-  // Agrupa por la categoría real de cada gasto (incluye personalizadas).
+  // Agrupa por la categoría real de cada gasto.
   const byCategory = useMemo(() => {
     const totals = new Map<string, number>();
     for (const e of expenses) totals.set(e.category, (totals.get(e.category) ?? 0) + e.amount);
     return [...totals.entries()]
       .map(([id, value]) => {
-        const meta = resolveCategory(id, categories);
+        const meta = resolveCategory(id);
         return { name: meta.label, emoji: meta.emoji, value };
       })
       .filter((d) => d.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [expenses, categories]);
+  }, [expenses]);
 
   // Últimos 7 días
   const weekly = useMemo(() => {
